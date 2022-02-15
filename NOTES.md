@@ -472,7 +472,7 @@ Outra opção para buscar os fatos, é utilizar o módulo setup:
 $ sudo ansible db -m setup
 ```
 
-{red}Troubleshooting do problema no repo com relação ao apache2 no webserver2:{red}
+Troubleshooting do problema no repo com relação ao apache2 no webserver2:
 
 ```console
 $ sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
