@@ -4,10 +4,10 @@
 VAGRANT_DISABLE_VBOXSYMLINKCREATE=1
 
 vms = {
-  'ansible-server' => {'memory' => '1792', 'cpus' => 1, 'ip' => '200', 'box' => 'devopsbox/ubuntu-20.04', 'provision' => 'provision/ansible/ansible-server.yaml'},
-  'webserver1' => {'memory' => '768', 'cpus' => 1, 'ip' => '201', 'box' => 'devopsbox/ubuntu-20.04', 'provision' => 'provision/ansible/webserver1.yaml'},
-  'webserver2' => {'memory' => '768', 'cpus' => 1, 'ip' => '202', 'box' => 'devopsbox/centos-8.5', 'provision' => 'provision/ansible/webserver2.yaml'},
-  'dbserver' => {'memory' => '768', 'cpus' => 1, 'ip' => '203', 'box' => 'devopsbox/debian-10.11', 'provision' => 'provision/ansible/dbserver.yaml'}
+  'ansible-server' => {'memory' => '1692', 'cpus' => 1, 'ip' => '200', 'box' => 'devopsbox/ubuntu-20.04', 'provision' => 'provision/ansible/ansible-server.yaml'},
+  'webserver1' => {'memory' => '668', 'cpus' => 1, 'ip' => '201', 'box' => 'devopsbox/ubuntu-20.04', 'provision' => 'provision/ansible/webserver1.yaml'},
+  'webserver2' => {'memory' => '668', 'cpus' => 1, 'ip' => '202', 'box' => 'devopsbox/centos-8.5', 'provision' => 'provision/ansible/webserver2.yaml'},
+  'dbserver' => {'memory' => '668', 'cpus' => 1, 'ip' => '203', 'box' => 'devopsbox/debian-10.11', 'provision' => 'provision/ansible/dbserver.yaml'}
 }
 
 Vagrant.configure('2') do |config|
@@ -35,7 +35,7 @@ Vagrant.configure('2') do |config|
       win10.vm.box_version = "1.0"
       win10.vm.guest = :windows
       win10.vm.provider 'virtualbox' do |vb|
-        vb.memory = "1792"
+        vb.memory = "1692"
     end
       win10.vm.communicator = :winrm
         win10.winrm.username = "vagrant"
