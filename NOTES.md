@@ -640,7 +640,119 @@ Exemplo:
 
 [Ansible Galaxy](https://galaxy.ansible.com/)
 
-## Gerenciar Roles
+## Roles
+
+- Pacotes de configuração que podem ser usados para definir a configuração de um servidor
+- Cada role contém um ou mais playbooks, que podem ser usados para configurar um servidor de acordo com as necessidades
+- Criar um código modular, que pode ser compartilhado e reutilizado
+- Ex.: role chamada "database", responsável por instalar e configurar servidores MySQL e PostgreSQL
+- Encapsulando os dados necessários para realizar as tasks
+
+### Estrutura de uma Role
+
+- roles
+  - mysql - README.md
+    - defaults - main.yml
+    - files
+    - handlers - main.yml
+    - meta - meta.yml
+    - tasks - main.yml
+    - templates
+    - tests - inventory test.yml
+    - vars - main.yml
+
+- **defaults**: armezena o arquivo _main.yml_, contendo as variáveis que terão a prioridade mais baixa de todas as variáveis disponíveis. Pode ser facilmente substituído por qualquer outra variável, incluindo variáveis de inventário;
+- **files**: armazena arquivos de configuração de cada serviço. Exemplo: haproxy.cf;
+- **handlers**: armazena o arquivo _main.yml_, contendo as Handlers de cada serviço, como, por exemplo, reler ou reiniciar o HaProxy após o arquivo de configuração ser modificado;
+- **meta**: armazena o arquivo _main.yml_, contendo as dependências que uma Role possui;
+- **tasks**: armazena o arquivo _main.yml_, contendo as tarefas de instalação e configuração de cada serviço;
+- **templates**: armazena arquivos de templates que utilizam variáveis de fatos ou personalizadas. A extensão deve terminar em .j2 com base no template Jinja2 do Python. Exemplo: _haproxy.cf.j2_;
+- **tests**: o diretório tests possui um arquivo de inventário de amostra, que aponta para localhost; e um playbook _test.yml_, que está configurado para chamar a Role que você acabou de criar;
+- **vars**: armazena o arquivo _main.yml_, contendo as variáveis que serão utilzadas pelo arquivo _main.yml_ da pasta tasks
+
+### Include e Dependências
+
+Exemplo:
+
+- .../roles/postgresql/tasks/install.yml
+- .../roles/postgresql/tasks/configure.yml
+- .../roles/postgresql/tasks/service.yml
+- .../roles/postgresql/tasks/main.yml
+
+No arquivo _main.yml_:
+
+```yaml
+---
+- include: install.yml
+- include: configure.yml
+- include: service.yml
+```
+
+São consideradas boas práticas separar a instalação de pacotes, configuração e serviços em arquivos na pasta tasks. O arquivo _main.yml_ será usado para juntar todas as configurações através da opção _include_.
+
+O uso de dependências é comum quando uma role depende da outra. Exemplo:
+
+- .../roles/postgresql/tasks/repositories-pgsql.yml
+- .../roles/postgresql/meta/main.yml
+
+O arquivo meta:
+
+```yaml
+---
+dependencies:
+  - { role: repositories-pgsql }
+```
+
+### Diretórios vars e defaults
+
+Fornecem dados sobre suas aplicações através de Roles.
+
+Portas, caminhos, usuários, etc.
+
+Variáveis da pasta _defaults_ permitem fornecer valores por omissão. Esses podem ser substituídos de outros lugares, por exemplo, _vars_, _group_vars_ e _host_vars_.
+
+Exemplo:
+
+```yaml
+# .../roles/apache/defaults/main.yml
+---
+apache_port: 80
+```
+
+### Roles parametrizadas
+
+Em algumas situações, pode ser necessário substituir os parâmetros padrões especificados dentro do diretório _vars_ ou _defaults_ em uma Role.
+
+Exemplo:
+
+```yaml
+---
+- hosts: webservers
+  roles:
+    - { role: apache, port: 8080 }
+```
+
+### Comando ansible-galaxy
+
+Permite criar roles (ou pacotes de roles).
+
+Você também tem a opção de publicar suas Roles no site https://galaxy.ansible.com/ através de uma conta gratuita.
+
+Para criar uma nova Role, use o comando _ansible-galaxy init_. Exemplo:
+
+```console
+$ ansible-galaxy init apache
+```
+
+## Gerenciar Roles no Ansible
+
+Comando para listar as roles:
+
+```console
+$ ansible-galaxy role list
+```
+
+Para carregar uma Role, usamos a diretiva _roles_
 
 ## Tipos de Roles
 
