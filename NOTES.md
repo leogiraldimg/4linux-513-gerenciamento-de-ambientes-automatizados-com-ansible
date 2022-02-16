@@ -754,17 +754,49 @@ $ ansible-galaxy role list
 
 Para carregar uma Role, usamos a diretiva _roles_
 
-## Tipos de Roles
-
-## Variáveis
-
-## Criar Role com variáveis
-
 # Gerenciando Templates no Ansible
 
-## Introdução a Templates
+## Templates
 
-## Utilizar Roles com templates
+Arquivos de configuração com conteúdo dinâmico.
+
+Através de Templates, precisamos apenas de um único arquivo que leva entradas dinâmicas específicas para o host que está sendo executado.
+
+Utilizam Jinja2, que é uma linguagem de modelagem moderna para o designer que utiliza Python. Os arquivos de templates podem conter variáveis com base no template Jinja2 do Python.
+
+Exemplo:
+
+```python
+smtpd_banner = MTA da Dexter - Servidor {% ansible_fqdn %}
+```
+
+## Tipos de Templates
+
+Tipos de tags que os templates Jinja2 aceitam:
+
+- **{{ }}**: incorpora variáveis dentro de um template e imprime seu valor no arquivo resultante. Este é o uso mais comum de um template;
+- **{% %}**: incorpora declarações de código dentro de um template, por exemplo, para um loop. Por exemplo, as declarações if-else, que são avaliadas em tempo de execução, mas não são impressas.
+
+**Exemplos de Tags**:
+
+Incorporar variáveis:
+
+```python
+{{ pacotes_php }}
+```
+
+Incorporar declarações:
+
+```python
+{% ansible_default_ipv4 %}
+```
+
+## Gerenciar Roles com templates no Ansible
+
+## Gerenciar Banco de Dados no Ansible
+
+## Gerenciar Apache com pasta comaprtilhada por servidor NFS
+
 
 # Gerenciando Testes com Kitchen
 
