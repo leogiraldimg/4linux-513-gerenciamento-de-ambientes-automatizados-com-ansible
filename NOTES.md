@@ -797,26 +797,326 @@ Incorporar declarações:
 
 ## Gerenciar Apache com pasta comaprtilhada por servidor NFS
 
-
 # Gerenciando Testes com Kitchen
 
-## Conhecendo o Kitchen
+Conjunto de testes para executar código de infra em uma ou mais plataformas isoladamente.
 
-## Instalar o Kitchen
+Uma arquitetura de plug-in de driver é usada para executar código em vários provedores de nuvem e tecnologias de virtualização.
+
+O Kitchen cria, destrói, provisiona e verifica sistemas. Os sistemas são criados usando um driver backend, os mais comuns são Vagrant e Docker. Quando os sistemas ficam disponíveis, o Kitchen pode provisioná-los por meio de um processo de convergência, usando uma solução de configuração de alteração popular como Ansible ou Chef. Após o provisionamento, você pode verificar a correção dessas alterações por meio de um plug-in verificador.
+
+O verificador é o sistema _busser_, que instalará a ferramenta de teste no sistema local e a verificará usando a execução local no sistema convidado. Você pode usar outros plug-ins.
 
 ## Gerenciar Roles com Kitchen
 
-## Gerenciar testes com Kitchen
+Necessário instalar o *ruby-full*:
+
+```console
+$ sudo apt install ruby-full -y
+```
+
+Instale os pacotes necessários para utilizar o **kitchen**:
+
+```console
+$ sudo gem install test-kitchen kitchen-docker kitchen-ansible
+```
+
+Principais comandos do kitchen:
+
+- **init role**: cria a estrutura de testes do kitchen em uma Role existente;
+- **create**: usa o provisionador para criar as instâncias;
+- **list**: lista o status das instâncias;
+- **converge**: usa o provisionador Ansible para aplicar as configurações da Role nas instâncias;
+- **login**: permite fazer login em uma instância;
+- **setup**: permite instalar o Ruby, Bundler e Serverspec para a realização dos testes;
+- **verify**: executa testes Serverspec em instâncias;
+- **destroy**: usa o provisionador para destruir as intâncias;
+- **test**: realiza todas as etapas (criar, convergir, configurar, verificar, destruir)
+
+Criar a infraestrutura de arquivos e pastas com o comando init:
+
+```console
+$ sudo kitchen init -D docker -P ansible_playbook
+```
+
+Arquivo kitchen.yml
+
+```yaml
+---
+driver:
+  name: docker
+
+provisioner:
+  name: ansible_playbook
+
+platforms:
+  - name: ubuntu-20.04
+  - name: centos-8
+
+suites:
+  - name: default
+    run_list:
+    attributes:
+```
+
+Descrição:
+
+- **driver**: define o Driver responsável por criar a máquina que usaremos a nossa Role;
+- **provisioner**: define o provisionador que aplica as configurações da Role na instância criado pelo Driver. Em nosso caso, usaremos o provisionador ansible_playbook;
+- **platforms**: define a lista de sistemas operacionais em que vamos testa a nossa Role. Como estamos usando o Driver docker, o Kitchen criará uma imagem e container;
+- **suites**: define o que queremos testar. Em nosso caso, vamos usar o Serverspec para realizar testes.
+
+Através do Serverspec, você pode escrever testes RSpec para verificar se seus servidores estão configurados corretamente.
+
+Mostrar o estado das máquinas configuradas a partir do _kitchen.yml_:
+
+```console
+$ sudo kitchen list
+```
+
+### Criar ambiente de testes com Kitchen
+
+Este é o conteúdo a ser colocado no kitchen.yml da role web-balancer:
+
+```yaml
+---
+driver:
+  name: docker
+
+provisioner:
+  name: ansible_playbook
+  hosts: all
+  require_ansible_repo: true
+  require_ansible_omnibus: false
+  ansible_verbose: true
+  ansible_verbosity: 1
+  ansible_diff: true
+  roles_path: ../../roles
+  require_chef_for_busser: true
+
+platforms:
+  - name: Ubuntu
+    driver_config:
+      image: ubuntu:20.04
+      platform: ubuntu
+
+suites:
+  - name: default
+    verifier:
+      patterns:
+        - test/integration/default/serverspec/default_spec.rb
+```
+
+O caminho test/integration/default/serverspec/default_spec.rb.
+
+Crie a instância através do subcomando _create_:
+
+```console
+$ sudo kitchen create
+```
+
+Para remover a instância, utilize o subcomando _destroy_:
+
+```console
+$ sudo kitchen destroy
+```
+
+### Testar o funcionamento de uma Role com kitchen
+
+O arquivo default.yml será responsável por carregar a Role durante a etapa de Converge:
+
+```yaml
+---
+- hosts: localhost
+  roles:
+    - web-balancer
+```
+
+Aplicar a etapa de convergência, para que nosso provisionador Ansible aplique as configurações de Role no container:
+
+```console
+$ sudo kitchen converge
+```
+
+Após o converge, ao listar as instâncias, perceba que o estado mudou para Converged:
+
+```console
+$ sudo kitchen list
+Instance        Driver  Provisioner      Verifier  Transport  Last Action  Last Error
+default-Ubuntu  Docker  AnsiblePlaybook  Busser    Ssh        Converged    <None>
+```
+
+### Logar nas instâncias de testes
+
+Podemos logar nas instâncias através do subcomando _login_:
+
+```console
+$ sudo kitchen login default-Ubuntu
+```
+
+### Testar o funcionamento da aplicação com o Kitchen
+
+Antes de realizar a verificação de infraestrutura, precisamos instalar o Ruby, Bundler e Serverspec com o subcomando _setup_:
+
+```console
+$ sudo kitchen setup
+-----> Starting Test Kitchen (v3.2.2)
+-----> Setting up <default-Ubuntu>...
+       Finished setting up <default-Ubuntu> (0m0.00s).
+-----> Test Kitchen is finished. (0m0.33s)
+```
+
+Antes de realizar o teste, precisamos criar a infraestrutura de diretórios que definimos no arquivo kitchen.yml:
+
+```console
+$ sudo mkdir -p test/integration/default/serverspec
+```
+
+Conteúdo do arquivo test/integration/default/serverspec/default_spec.rb:
+
+```ruby
+require 'serverspec'
+
+set :backend, :exec
+
+describe package('nginx') do
+  it { should be_installed }
+end
+
+describe file('/etc/nginx/nginx.conf') do
+  it { should contain 'proxy_pass http\:\/\/cluster' }
+end
+
+describe service('nginx') do
+  it { should be_enabled }
+  it { should be_running }
+end
+
+describe port(80) do
+  it { should be_listening }
+end
+```
+
+O arquivo default_spec.rb verificará se o pacote nginx está instalado, se o serviço nginx está sendo executado e escutando na porta 80, e se o arquivo /etc/nginx/nginx.conf possui a string _proxy_pass_ http://cluster.
+
+Verifique a infraestrutura com o subcomando _verify_:
+
+```console
+$ sudo kitchen verify
+```
+
+### Realizar teste completo com o Kitchen
+
+Antes de realizar o teste completo, vamos destruir a instância.
+
+```console
+$ sudo kitchen destroy
+```
+
+Vamos realizar o teste completo (criar, convergir, configurar, verificar e destruir) através do subcomando test:
+
+```console
+$ sudo kitchen test
+```
+
+[Exemplos de testes com o Serverspec](https://serverspec.org/resource_types.html)
 
 # Gerenciando Testes com Molecule
 
-## Conhecendo o Molecule
+O Molecule é um projeto que fornece uma abordagem para automatizar o desenvolvimento e teste de funções do Ansible. Ele permite que você crie uma série de testes funcionais para verificar se as suas funções estão funcionando corretamente. Além disso, também fornece um ambiente para executar esses testes com uma série de dispositivos de destino.
 
-## Instalar o Molecule
+## Criar Roles com Molecule
 
-## Gerenciar Roles com Molecule
+Instale os pacotes necessários para utilizar o **molecule**:
 
-## Gerenciar testes com Molecule
+```console
+$ sudo pip3 install "molecule[docker,lint,ansible]"
+```
+
+Verifique os componentes presentes na infraestrutura do Molecule:
+
+```console
+$ sudo molecule --version
+molecule 3.6.1 using python 3.8
+    ansible:2.12.2
+    delegated:3.6.1 from molecule
+    docker:1.1.0 from molecule_docker requiring collections: community.docker>=1.9.1
+```
+
+Valide se o Docker está presente na lista de Drivers:
+
+```console
+$ sudo molecule drivers
+╶───────────────────────────────────────────────────────────────────────────────────────────╴
+  delegated
+  docker
+```
+
+Crie a infra de arquivos e pastas em uma nova Role com o subcomando:
+
+```console
+$ sudo molecule init role acme.apache --driver-name docker
+```
+
+Função dos arquivos em apache/molecule/default:
+
+- **converge.yml**: contém a chamada para a sua Role. O Molecule invocará este playbook através do ansible-playbook e o executará em uma instância criada pelo driver;
+- **molecule.yml**: arquivo principal do Molecule, responsável por configurar o ambiente de testes definindo drivers, provisionadores e ferramentas de verificação;
+- **verify.yml**: contém testes específicos em relação ao estado do contêiner, sendo o arquivo que o Ansible usa como verificador padrão.
+
+Conteúdo do arquivo _molecule.yml_:
+
+```yaml
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: Ubuntu
+    image: geerlingguy/docker-ubuntu2004-ansible
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    pre_build_image: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+  - name: CentOS
+    image: geerlingguy/docker-centos8-ansible
+    pre_build_image: true
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+provisioner:
+  name: ansible
+verifier:
+  name: ansible
+lint: |
+  set -e
+  yamllint .
+  ansible-lint .
+```
+
+- **dependency**: define as dependências da Role;
+- **driver**: define o Driver responsável por criar a máquina que usaremos para testar a nossa Role;
+- **platforms**: define a lista de sistemas operacionais em que vamos testar a nossa Role. Como estamos usando o driver Docker, podemos personalizar informando imagens de repos públicos ou privados;
+- **provisioner**: define o provisionador que aplica as configurações da Role, instância criada pelo Driver. Em nosso caso, usaremos o provisionador ansible_playbook;
+- **verifier**: define a ferramenta de verificação. Em nosso caso, usaremos o Ansible.
+
+Estamos usando o Lint para verificar a sintaxe de nossas Roles
+
+Mostrar o estado de todas as máquinas configuradas a partir do arquivo _molecule.yml_:
+
+```console
+$ sudo molecule list
+INFO     Running default > list
+                ╷             ╷                  ╷               ╷         ╷
+  Instance Name │ Driver Name │ Provisioner Name │ Scenario Name │ Created │ Converged
+╶───────────────┼─────────────┼──────────────────┼───────────────┼─────────┼───────────╴
+  Ubuntu        │ docker      │ ansible          │ default       │ false   │ false
+  CentOS        │ docker      │ ansible          │ default       │ false   │ false
+                ╵             ╵                  ╵               ╵         ╵
+```
 
 # Gerenciar ambientes com Ansible Galaxy
 
