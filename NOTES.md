@@ -1118,15 +1118,201 @@ INFO     Running default > list
                 ╵             ╵                  ╵               ╵         ╵
 ```
 
+Instalar o _ansible-lint_:
+
+```console
+$ sudo apt install ansible-lint -y
+```
+
+## Verificar sintaxe de playbooks com Molecule
+
+Para testar a sintaxe dos playbooks, execute o subcomando _lint_:
+
+```console
+$ sudo molecule lint
+```
+
+## Criar ambiente de testes com Molecule
+
+Crie a instância através do subcomando _create_:
+
+```console
+$ sudo molecule create
+```
+
+Verifique se as instâncias possuem o status _true_ na coluna Created:
+
+```console
+$ sudo molecule list
+INFO     Running default > list
+                ╷             ╷                  ╷               ╷         ╷
+  Instance Name │ Driver Name │ Provisioner Name │ Scenario Name │ Created │ Converged
+╶───────────────┼─────────────┼──────────────────┼───────────────┼─────────┼───────────╴
+  Ubuntu        │ docker      │ ansible          │ default       │ false   │ false
+  CentOS        │ docker      │ ansible          │ default       │ false   │ false
+                ╵             ╵                  ╵               ╵         ╵
+```
+
+É possível verificar que novas imagens do Docker foram criadas:
+
+```console
+$ sudo docker image list
+REPOSITORY   TAG       IMAGE ID       CREATED        SIZE
+<none>       <none>    26cfe63082ec   22 hours ago   233MB
+ubuntu       20.04     54c9d81cbb44   2 weeks ago    72.8MB
+```
+
+Para remover a instância, utilize o subcomando _destroy_:
+
+```console
+$ sudo molecule destroy
+```
+
+É possível verificar que os containers não estão mais em execução, mas as imagens permanecem:
+
+```console
+$ sudo docker container list
+
+$ sudo docker image list
+```
+
+## Adicionar estrutura do Molecule em uma role existente
+
+Para começar, vamos acessar o diretório da Role nfs-server:
+
+```console
+$ sudo molecule init scenario -r nfs-server -d docker
+```
+
+Arquivo _molecule.yml_:
+
+```yaml
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: Ubuntu
+    image: docker-nfs-server-ubuntu:latest
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    pre_build_image: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+  - name: CentOS
+    image: docker-nfs-server-centos:latest
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    pre_build_image: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+provisioner:
+  name: ansible
+verifier:
+  name: ansible
+lint: |
+  set -e
+  yamllint .
+  ansible-lint .
+```
+
+Foi possível observar que o arquivo _molecule.yml_ está usando as imagens _docker-nfs-server-ubuntu:latest_ e _docker-nfs-server-centos:latest_. Essas imagens não estão disponíveis no Docker Hub, sendo assim, é necessário criá-las;
+
+Para criá-las, utilizamos o arquivo modelo _Dockerfile_ da pasta docker-nfs-server-ubuntu, disponível na HOME do usuário suporte:
+
+```dockerfile
+FROM geerlingguy/docker-ubuntu2004-ansible
+ENV DEBIAN_FRONTEND noninteractive
+RUN apt update -qq && apt install -y nfs-kernel-server runit inotify-tools -qq
+RUN mkdir -p /opt/site
+VOLUME /opt/site
+EXPOSE 111/udp 2049/tcp
+```
+
+Para gerar uma nova imagem Docker use o comando _docker image build_:
+
+```console
+$ sudo docker image build -t docker-nfs-server-ubuntu ~/docker-nfs-server-ubuntu
+```
+
+Para verificar se a imagem foi gerada:
+
+```console
+$ sudo docker image ls docker-nfs-server-ubuntu
+```
+
+## Testar o funcionamento da Role com Molecule
+
+Vamos aplicar a etapa de convergência para que nosso provisionador Ansible aplique as configurações da Role no container:
+
+```console
+$ sudo molecule converge
+```
+
+## Testar a idempotência de uma Role nfs-server com Molecule
+
+Para testar a idempotência em nossa Role, execute o subcomando _idempotence_:
+
+```console
+$ sudo molecule idempotence
+```
+
+## Testar o funcionamento da aplicação com Molecule
+
+Arquivo _verify.yml_:
+
+```yaml
+---
+- name: Verifica o funcionamento do servidor NFS
+  hosts: all
+  gather_facts: false
+  tasks:
+  - name: Example assertion
+    assert:
+      that: true
+  - name: Testando o compartilhamento NFS
+    shell: "showmount -e --no-headers"
+    register: showmount_result
+    failed_when: showmount_result.stdout != "/opt/site 172.16.0.0/24"
+```
+
+Para verificar se a aplicação está funcionando corretamente utilize o subcomando _verify_:
+
+```console
+$ sudo molecule verify
+```
+
+## Realizar teste completo na role
+
+Teste completo = dependência, lint, limpeza, destruição, sintaxe, criação, preparação, convergência, idempotência, efeito lateral, verificação e limpeza.
+
+```console
+$ sudo molecule test
+```
+
 # Gerenciar ambientes com Ansible Galaxy
 
-## Conhecendo o Ansible Galaxy
+## Ansible Galaxy
+
+Repositório de pacotes de software para Ansible. Ele permite baixar e usar pacotes de software de automação de infraestrutura construídos por outros usuários da comunidade Ansible. Os pacotes de software estão disponíveis para todos os sistemas operacionais suportados por Ansible.
+
+Para usar o Galaxy, você precisa ter uma conta gratuita na página do [Galaxy](https://galaxy.ansible.com)
 
 ## Comandos essenciais do Ansible Galaxy
 
-## Enviar Roles para o Github
+```console
+$ sudo ansible-galaxy role list
+$ sudo ansible-galaxy role search ntpdate
+$ sudo ansible-galaxy role search --author geerlingguy
+$ sudo ansible-galaxy role search --author geerlingguy --galaxy-tags ntp
+$ sudo ansible-galaxy role info geerlingguy.ntp
+$ sudo ansible-galaxy role install geerlingguy.ntp
+$ sudo ansible-galaxy role remove geerlingguy.ntp
+```
 
-## Sincronizar Roles do Github com Ansible Galaxy
+## Sincronizar Roles no Github com Ansible Galaxy
+
 
 # Gerenciar ambientes com AWX
 
